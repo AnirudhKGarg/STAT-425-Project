@@ -55,10 +55,14 @@ ggplot(data = data1, aes(x = X, y = Y)) +
 Model 1
 ```{r}
 data1 <- filter(data, area > 0)
+
+gbase = lm(log(area+1)~ log(temp) + RH + log(wind), data1)
+#summary(gbase)
+
 w = bs(data1$wind,df=8, intercept=TRUE)
-t = bs(log(data1$temp),df=8, intercept=TRUE)
+t = bs(log(data1$temp),df=16, intercept=TRUE)
 h = bs(data1$RH,df=5, intercept=TRUE)
-g1 = lm(log(area+1) ~ w*t*h, data1)
+g1 = lm(log(area+1) ~ t, data1)
 summary(g1)
 #plot(g1)
 ggplot(data1, aes(x=temp, y=log(area + 1))) + 
@@ -72,14 +76,14 @@ i = bs(data1$ISI,df = 10, intercept=TRUE)
 f = bs(data1$FFMC,df = 10, intercept=TRUE)
 g2 = lm(log(area+1) ~ d*i*f, data1)
 summary(g2)
-ggplot(data1, aes(x=FFMC, y=log(area+1))) + 
+ggplot(data1, aes(x=temp, y=log(area+1))) + 
   geom_point(color = "seagreen") +
   geom_line(aes(y=predict(g2)))
 ```
 Model 3
 ```{r}
-plot(log(area+1) ~ FFMC, data = data1, main = "data(cars)  &  smoothing splines")
-ssf10 <- smooth.spline(data1$FFMC, log(data1$area), df = 16)
+plot(log(area+1) ~ temp, data = data1)
+ssf10 <- smooth.spline(data1$temp, log(data1$area), df = 16)
 lines(ssf10, lty = 2, col = "red")
 ```
 Model 4
@@ -136,9 +140,36 @@ df_fire <- df %>%
     select(everything()) %>% 
     filter(month %in% hot_months) %>% 
     filter(fire == 1)
+Q1 <- quantile(df_fire$area, .25)
+Q3 <- quantile(df_fire$area, .75)
+IQR <- IQR(df_fire$area)
+df_fire1 <- subset(df_fire, df_fire$area> (Q1 - 1.5*IQR) & df_fire$area< (Q3 + 1.5*IQR))
+Q1 <- quantile(df_fire$temp, .25)
+Q3 <- quantile(df_fire$temp, .75)
+IQR <- IQR(df_fire$temp)
+df_fire1 <- subset(df_fire, df_fire$temp> (Q1 - 1.5*IQR) & df_fire$temp< (Q3 + 1.5*IQR))
+#Q1 <- quantile(df_fire$wind, .25)
+#Q3 <- quantile(df_fire$wind, .75)
+#IQR <- IQR(df_fire$wind)
+#df_fire1 <- subset(df_fire, df_fire$wind> (Q1 - 1.5*IQR) & df_fire$wind< (Q3 + 1.5*IQR))
 
-fire_model <- lm(log(area+1) ~ log(temp) + log(RH) + wind + I(wind^2), data = df_fire)
+fire_model <- lm(log(area+1) ~ log(temp) + log(RH) + wind + I(wind^2), data = df_fire1)
 summary(fire_model)
+
+ggplot(df_fire1, aes(x=temp, y=log(area+1))) + 
+  geom_point(color = "seagreen") +
+  geom_line(aes(y=predict(fire_model)))
+
+
+w = bs(df_fire1$wind,df=16, intercept=TRUE)
+t = bs(log(df_fire1$temp),df=30, intercept=TRUE)
+h = bs(df_fire1$RH,df=16, intercept=TRUE)
+g1 = lm(log(area+1) ~ t, df_fire1)
+summary(g1)
+#plot(g1)
+ggplot(df_fire1, aes(x=temp, y=log(area + 1))) + 
+  geom_point(color = "seagreen") +
+  geom_line(aes(y=predict(g1)))
 ```
 ```{r}
 df_pred <- df %>% 
