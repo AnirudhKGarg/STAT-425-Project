@@ -139,6 +139,7 @@ acc_test <- mean(pred_test == df_test$fire)
 df_fire <- df %>% 
     select(everything()) %>% 
     filter(month %in% hot_months) %>% 
+<<<<<<< HEAD
     filter(fire == 1)
 Q1 <- quantile(df_fire$area, .25)
 Q3 <- quantile(df_fire$area, .75)
@@ -154,6 +155,15 @@ df_fire1 <- subset(df_fire, df_fire$temp> (Q1 - 1.5*IQR) & df_fire$temp< (Q3 + 1
 #df_fire1 <- subset(df_fire, df_fire$wind> (Q1 - 1.5*IQR) & df_fire$wind< (Q3 + 1.5*IQR))
 
 fire_model <- lm(log(area+1) ~ log(temp) + log(RH) + wind + I(wind^2), data = df_fire1)
+=======
+    filter(fire == 1) 
+
+<<<<<<< Updated upstream
+fire_model <- lm(log(area+1) ~ log(temp) + log(RH) + wind + I(wind^2), data = df_fire)
+=======
+fire_model <- lm(log(area + 1) ~ FFMC + log(RH) + log(temp) + DC + DMC + log(rain + 1), data = df_fire)
+>>>>>>> Stashed changes
+>>>>>>> f87cf0e60ad112091268af56167c9f1a2423a959
 summary(fire_model)
 
 ggplot(df_fire1, aes(x=temp, y=log(area+1))) + 
@@ -171,9 +181,11 @@ ggplot(df_fire1, aes(x=temp, y=log(area + 1))) +
   geom_point(color = "seagreen") +
   geom_line(aes(y=predict(g1)))
 ```
+
 ```{r}
 df_pred <- df %>% 
     select(FFMC:area)
 cor(df_pred)
 ```
+
 
