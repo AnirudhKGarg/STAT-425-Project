@@ -4,37 +4,188 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
-
 
 Libraries
 ```{r}
 library(tidyverse)
+library(splines)
+library(glmnet)
+library(pROC)
 ```
 
 Dataset
 ```{r}
 data <- read.csv("forestfires.csv")
-
+data <- tibble::rowid_to_column(data, "index")
 data
 ```
 
+Data Plots
 ```{r}
-ggplot(data = data, aes(x = temp, y = area)) +
+ggplot(data = data1, aes(x = temp, y = log(area+1))) +
     geom_point(color = "red") +
     labs(title = "Temp vs Area")
-```
-
-```{r}
-ggplot(data = data, aes(x = RH, y = area)) +
+ggplot(data = data1, aes(x = RH, y = log(area+1))) +
     geom_point(color = "steelblue") +
     labs(title = "Humidity vs Area")
+ggplot(data = data1, aes(x = wind, y = log(area+1))) +
+    geom_point(color = "green") +
+    labs(title = "wind vs Area")
+ggplot(data = data1, aes(x = rain, y = log(area+1))) +
+    geom_point(color = "cyan") +
+    labs(title = "Rain vs Area")
+ggplot(data = data1, aes(x = ISI, y = log(area+1))) +
+    geom_point(color = "darkolivegreen") +
+    labs(title = "ISI vs Area")
+ggplot(data = data1, aes(x = DC, y = log(area+1))) +
+    geom_point(color = "firebrick") +
+    labs(title = "DC vs Area")
+ggplot(data = data1, aes(x = DMC, y = log(area+1))) +
+    geom_point(color = "goldenrod") +
+    labs(title = "DMC vs Area")
+ggplot(data = data1, aes(x = FFMC, y = log(area+1))) +
+    geom_point(color = "sienna") +
+    labs(title = "FFMC vs Area")
+ggplot(data = data1, aes(x = X, y = Y)) +
+    geom_point(color = "sienna") +
+    labs(title = "FFMC vs Area")
+```
+Model 1
+```{r}
+data1 <- filter(data, area > 0)
+
+gbase = lm(log(area+1)~ log(temp) + RH + log(wind), data1)
+#summary(gbase)
+
+w = bs(data1$wind,df=8, intercept=TRUE)
+t = bs(log(data1$temp),df=16, intercept=TRUE)
+h = bs(data1$RH,df=5, intercept=TRUE)
+g1 = lm(log(area+1) ~ t, data1)
+summary(g1)
+#plot(g1)
+ggplot(data1, aes(x=temp, y=log(area + 1))) + 
+  geom_point(color = "seagreen") +
+  geom_line(aes(y=predict(g1)))
+```
+Model 2
+```{r}
+d = bs(data1$DMC,df = 10, intercept=TRUE)
+i = bs(data1$ISI,df = 10, intercept=TRUE)
+f = bs(data1$FFMC,df = 10, intercept=TRUE)
+g2 = lm(log(area+1) ~ d*i*f, data1)
+summary(g2)
+ggplot(data1, aes(x=temp, y=log(area+1))) + 
+  geom_point(color = "seagreen") +
+  geom_line(aes(y=predict(g2)))
+```
+Model 3
+```{r}
+plot(log(area+1) ~ temp, data = data1)
+ssf10 <- smooth.spline(data1$temp, log(data1$area), df = 16)
+lines(ssf10, lty = 2, col = "red")
+```
+Model 4
+
+We get the hottest months
+```{r}
+data %>% 
+    select(month, temp) %>% 
+    group_by(month) %>% 
+    summarise(mean_temp = mean(temp) ) %>% 
+    arrange(mean_temp)
+```
+
+
+```{r}
+hot_months <- c("may", "jun", "jul", "aug", "sep", "oct") #6 hottest months
+
+df <- data %>% 
+    select(everything()) %>% 
+    filter(month %in% hot_months) %>% 
+    mutate(fire = ifelse(area > 0, 1, 0))
+
+df_train <- df %>% 
+    sample_frac(0.7)
+
+df_test <- anti_join(df, df_train, by = "index")
+
+df
 ```
 
 ```{r}
-ggplot(data = data, aes(x = temp, y = area)) +
-    geom_point(color = "green") +
-    labs(title = "wind vs Area")
+gen_model <- glm(fire ~ temp + RH + wind + rain, data = df_train, family = gaussian)
+summary(gen_model)
+
+prob_test <- predict(gen_model, newdata = df_test, type = "response")
+
+# Compute the AUC-ROC for the model's predictions on the test set
+roc_test <- roc(df_test$fire, prob_test)
+roc_test
+
+# Plot the ROC curve
+plot(roc_test)
+
+# Convert predicted probabilities to predicted binary labels using a threshold of 0.90
+pred_test <- ifelse(prob_test >= 0.9, 1, 0)
+
+# Compute the accuracy for the model's predictions on the test set
+acc_test <- mean(pred_test == df_test$fire)
+
 ```
+
+```{r}
+df_fire <- df %>% 
+    select(everything()) %>% 
+    filter(month %in% hot_months) %>% 
+<<<<<<< HEAD
+    filter(fire == 1)
+Q1 <- quantile(df_fire$area, .25)
+Q3 <- quantile(df_fire$area, .75)
+IQR <- IQR(df_fire$area)
+df_fire1 <- subset(df_fire, df_fire$area> (Q1 - 1.5*IQR) & df_fire$area< (Q3 + 1.5*IQR))
+Q1 <- quantile(df_fire$temp, .25)
+Q3 <- quantile(df_fire$temp, .75)
+IQR <- IQR(df_fire$temp)
+df_fire1 <- subset(df_fire, df_fire$temp> (Q1 - 1.5*IQR) & df_fire$temp< (Q3 + 1.5*IQR))
+#Q1 <- quantile(df_fire$wind, .25)
+#Q3 <- quantile(df_fire$wind, .75)
+#IQR <- IQR(df_fire$wind)
+#df_fire1 <- subset(df_fire, df_fire$wind> (Q1 - 1.5*IQR) & df_fire$wind< (Q3 + 1.5*IQR))
+
+fire_model <- lm(log(area+1) ~ log(temp) + log(RH) + wind + I(wind^2), data = df_fire1)
+=======
+    filter(fire == 1) 
+
+<<<<<<< Updated upstream
+fire_model <- lm(log(area+1) ~ log(temp) + log(RH) + wind + I(wind^2), data = df_fire)
+=======
+fire_model <- lm(log(area + 1) ~ FFMC + log(RH) + log(temp) + DC + DMC + log(rain + 1), data = df_fire)
+>>>>>>> Stashed changes
+>>>>>>> f87cf0e60ad112091268af56167c9f1a2423a959
+summary(fire_model)
+
+ggplot(df_fire1, aes(x=temp, y=log(area+1))) + 
+  geom_point(color = "seagreen") +
+  geom_line(aes(y=predict(fire_model)))
+
+
+w = bs(df_fire1$wind,df=16, intercept=TRUE)
+t = bs(log(df_fire1$temp),df=30, intercept=TRUE)
+h = bs(df_fire1$RH,df=16, intercept=TRUE)
+g1 = lm(log(area+1) ~ t, df_fire1)
+summary(g1)
+#plot(g1)
+ggplot(df_fire1, aes(x=temp, y=log(area + 1))) + 
+  geom_point(color = "seagreen") +
+  geom_line(aes(y=predict(g1)))
+```
+
+```{r}
+df_pred <- df %>% 
+    select(FFMC:area)
+cor(df_pred)
+```
+
 
